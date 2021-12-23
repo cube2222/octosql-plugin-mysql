@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/jackc/pgx"
 
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
@@ -25,13 +24,6 @@ type Config struct {
 
 func (c *Config) Validate() error {
 	return nil
-}
-
-type testLogger struct {
-}
-
-func (t *testLogger) Log(level pgx.LogLevel, msg string, data map[string]interface{}) {
-	log.Printf("%s %s %+v", level, msg, data)
 }
 
 func connect(config *Config) (*sql.DB, error) {
