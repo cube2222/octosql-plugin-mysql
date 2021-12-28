@@ -1,7 +1,7 @@
 module github.com/cube2222/octosql-plugin-mysql
 
 require (
-	github.com/cube2222/octosql v0.3.1-0.20211223174604-6da987f5825a
+	github.com/cube2222/octosql v0.3.1-0.20211228222236-e91e2c06dd01
 	github.com/go-sql-driver/mysql v1.6.0
 )
 
