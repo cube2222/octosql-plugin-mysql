@@ -15,9 +15,10 @@ type DatasourceExecuting struct {
 	fields []physical.SchemaField
 	table  string
 
-	placeholderExprs []Expression
-	db               *sql.DB
-	stmt             *sql.Stmt
+	placeholderExprTypes []octosql.Type
+	placeholderExprs     []Expression
+	db                   *sql.DB
+	stmt                 *sql.Stmt
 }
 
 func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
@@ -28,7 +29,7 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 			return fmt.Errorf("couldn't evaluate pushed-down predicate placeholder expression: %w", err)
 		}
 		// TODO: Use internal function for this.
-		placeholderValues[i] = value.ToRawGoValue()
+		placeholderValues[i] = value.ToRawGoValue(d.placeholderExprTypes[i])
 	}
 
 	rows, err := d.stmt.QueryContext(ctx, placeholderValues...)

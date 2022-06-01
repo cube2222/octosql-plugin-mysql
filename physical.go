@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/cube2222/octosql/execution"
@@ -11,11 +12,15 @@ import (
 )
 
 type impl struct {
-	config *Config
-	table  string
+	config  *Config
+	table   string
+	verbose bool
 }
 
 func (impl *impl) Materialize(ctx context.Context, env physical.Environment, schema physical.Schema, pushedDownPredicates []physical.Expression) (execution.Node, error) {
+	if impl.verbose {
+		log.Printf("Materializing %s with schema: %+v", impl.table, schema)
+	}
 	// Prepare statement
 	db, err := connect(impl.config)
 	if err != nil {
@@ -25,29 +30,38 @@ func (impl *impl) Materialize(ctx context.Context, env physical.Environment, sch
 	for index := range schema.Fields {
 		fields[index] = schema.Fields[index].Name
 	}
+	if impl.verbose {
+		log.Printf("Materializing %s with fields: %+v", impl.table, fields)
+	}
 
 	predicateSQL, placeholderExpressions := predicatesToSQL(pushedDownPredicates)
 	sql := fmt.Sprintf("SELECT %s FROM %s WHERE %s", strings.Join(fields, ", "), impl.table, predicateSQL)
+	if impl.verbose {
+		log.Printf("Preparing %s query: '%+v'", impl.table, sql)
+	}
 	stmt, err := db.PrepareContext(ctx, sql)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't prepare statement '%s': %w", sql, err)
 	}
 
 	executionPlaceholderExprs := make([]execution.Expression, len(placeholderExpressions))
+	placeholderExprTypes := make([]octosql.Type, len(placeholderExpressions))
 	for i := range placeholderExpressions {
 		expr, err := placeholderExpressions[i].Materialize(ctx, env)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't materialize pushed-down predicate placeholder expression: %w", err)
 		}
 		executionPlaceholderExprs[i] = expr
+		placeholderExprTypes[i] = placeholderExpressions[i].Type
 	}
 
 	return &DatasourceExecuting{
-		fields:           schema.Fields,
-		table:            impl.table,
-		placeholderExprs: executionPlaceholderExprs,
-		db:               db,
-		stmt:             stmt,
+		fields:               schema.Fields,
+		table:                impl.table,
+		placeholderExprTypes: placeholderExprTypes,
+		placeholderExprs:     executionPlaceholderExprs,
+		db:                   db,
+		stmt:                 stmt,
 	}, nil
 }
 

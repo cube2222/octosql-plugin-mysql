@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -42,19 +43,21 @@ func Creator(ctx context.Context, configUntyped plugins.ConfigDecoder) (physical
 		return nil, err
 	}
 	return &Database{
-		Config: &cfg,
+		Config:  &cfg,
+		Verbose: os.Getenv("OCTOSQL_MYSQL_VERBOSE") == "1",
 	}, nil
 }
 
 type Database struct {
-	Config *Config
+	Config  *Config
+	Verbose bool
 }
 
 func (d *Database) ListTables(ctx context.Context) ([]string, error) {
 	panic("implement me")
 }
 
-func (d *Database) GetTable(ctx context.Context, name string) (physical.DatasourceImplementation, physical.Schema, error) {
+func (d *Database) GetTable(ctx context.Context, name string, options map[string]string) (physical.DatasourceImplementation, physical.Schema, error) {
 	db, err := connect(d.Config)
 	if err != nil {
 		return nil, physical.Schema{}, fmt.Errorf("couldn't connect to database: %w", err)
@@ -76,6 +79,9 @@ func (d *Database) GetTable(ctx context.Context, name string) (physical.Datasour
 	if len(descriptions) == 0 {
 		return nil, physical.Schema{}, fmt.Errorf("table %s does not exist", name)
 	}
+	if d.Verbose {
+		log.Printf("Table field descriptions (SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name = '%s' ORDER BY ordinal_position): %+v", name, descriptions)
+	}
 
 	fields := make([]physical.SchemaField, 0, len(descriptions))
 	for i := range descriptions {
@@ -91,10 +97,14 @@ func (d *Database) GetTable(ctx context.Context, name string) (physical.Datasour
 			Type: t,
 		})
 	}
+	if d.Verbose {
+		log.Printf("Inferred schema (%s): %+v", name, fields)
+	}
 
 	return &impl{
-			config: d.Config,
-			table:  name,
+			config:  d.Config,
+			table:   name,
+			verbose: d.Verbose,
 		},
 		physical.Schema{
 			Fields:    fields,
@@ -119,7 +129,7 @@ func getOctoSQLType(typename string) (octosql.Type, bool) {
 	}
 
 	switch typename {
-	case "int":
+	case "int", "smallint":
 		return octosql.Int, true
 	case "char", "varchar", "text":
 		return octosql.String, true
