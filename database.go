@@ -63,7 +63,7 @@ func (d *Database) GetTable(ctx context.Context, name string, options map[string
 		return nil, physical.Schema{}, fmt.Errorf("couldn't connect to database: %w", err)
 	}
 
-	rows, err := db.QueryContext(ctx, "SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name = ? ORDER BY ordinal_position", name)
+	rows, err := db.QueryContext(ctx, "SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name = ? AND table_schema = ? ORDER BY ordinal_position", name, d.Config.Database)
 	if err != nil {
 		return nil, physical.Schema{}, fmt.Errorf("couldn't describe table: %w", err)
 	}
